@@ -357,6 +357,143 @@ export function createApiApp(): express.Express {
     }
   });
 
+  // Feature: Generate Music using Lyria 3 (lyria-3-clip-preview or lyria-3-pro-preview)
+  apiRouter.post('/gemini/generate-music', async (req, res) => {
+    try {
+      const {
+        prompt,
+        model = 'lyria-3-clip-preview',
+        durationSeconds = 15,
+        genre,
+        mood,
+        tempo,
+      } = req.body;
+
+      if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: 'Music prompt is required.' });
+      }
+
+      const clientKey = getApiKeyFromReq(req);
+      const ai = getGeminiClient(clientKey);
+
+      // Validate model choice
+      const validModel =
+        model === 'lyria-3-pro-preview' ? 'lyria-3-pro-preview' : 'lyria-3-clip-preview';
+
+      // Build structured prompt for Lyria
+      const tags: string[] = [];
+      if (genre) tags.push(`Genre: ${genre}`);
+      if (mood) tags.push(`Mood: ${mood}`);
+      if (tempo) tags.push(`Tempo: ${tempo}`);
+      if (durationSeconds) tags.push(`Duration: ${durationSeconds} seconds`);
+
+      const fullPrompt = tags.length > 0 ? `${prompt.trim()} (${tags.join(', ')})` : prompt.trim();
+
+      let audioData: string | undefined;
+      let mimeType: string = 'audio/mp3';
+      let audioUri: string | undefined;
+
+      // Primary strategy: Call interactions.create
+      try {
+        const interaction = await (ai as any).interactions.create({
+          model: validModel,
+          input: fullPrompt,
+        });
+
+        if (interaction.output_audio) {
+          audioData = interaction.output_audio.data;
+          mimeType = interaction.output_audio.mime_type || 'audio/mp3';
+          audioUri = interaction.output_audio.uri;
+        } else if (interaction.steps && Array.isArray(interaction.steps)) {
+          for (const step of interaction.steps) {
+            if (step.type === 'model_output' && Array.isArray(step.content)) {
+              for (const item of step.content) {
+                if (item.type === 'audio') {
+                  audioData = item.data;
+                  mimeType = item.mime_type || 'audio/mp3';
+                  audioUri = item.uri;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (interactionsErr: any) {
+        console.warn(
+          'Lyria interactions.create failed, attempting generateContent fallback:',
+          interactionsErr.message
+        );
+
+        // Fallback strategy: Call models.generateContent
+        try {
+          const genRes = await ai.models.generateContent({
+            model: validModel,
+            contents: fullPrompt,
+          });
+
+          const candidate = genRes.candidates?.[0];
+          const parts = candidate?.content?.parts || [];
+          for (const part of parts) {
+            if ((part as any).inlineData && (part as any).inlineData.data) {
+              audioData = (part as any).inlineData.data;
+              mimeType = (part as any).inlineData.mimeType || 'audio/mp3';
+              break;
+            }
+          }
+        } catch (genErr: any) {
+          // If both failed, propagate the original error
+          throw interactionsErr || genErr;
+        }
+      }
+
+      // If audioUri is present but no base64, fetch audio
+      if (!audioData && audioUri) {
+        try {
+          const rawKey = clientKey || process.env.GEMINI_API_KEY;
+          const fetchRes = await fetch(audioUri, {
+            headers: rawKey ? { 'x-goog-api-key': rawKey } : {},
+          });
+          if (fetchRes.ok) {
+            const buf = await fetchRes.arrayBuffer();
+            audioData = Buffer.from(buf).toString('base64');
+            const fetchedMime = fetchRes.headers.get('content-type');
+            if (fetchedMime) mimeType = fetchedMime;
+          }
+        } catch (fetchErr: any) {
+          console.warn('Failed to fetch audio from URI:', fetchErr.message);
+        }
+      }
+
+      if (!audioData && !audioUri) {
+        return res.status(502).json({
+          error:
+            'Lyria music generation model did not return playable audio. Please try modifying your prompt or selecting a different duration.',
+        });
+      }
+
+      const audioUrl = audioData ? `data:${mimeType};base64,${audioData}` : audioUri;
+
+      return res.json({
+        success: true,
+        audioUrl,
+        mimeType,
+        model: validModel,
+        durationSeconds: validModel === 'lyria-3-clip-preview' ? Math.min(durationSeconds, 30) : durationSeconds,
+        prompt: fullPrompt,
+        title: prompt.slice(0, 40),
+      });
+    } catch (err: any) {
+      console.error('Lyria music generation error:', err);
+      const status = err.status || (err.message?.includes('400') ? 400 : 500);
+      return res.status(status).json({
+        error:
+          err.message ||
+          'Failed to generate music with Lyria. Make sure your Gemini API Key has access to the Lyria paid model tier.',
+        status,
+      });
+    }
+  });
+
   // Mount API router on both /api (standard) and root / (in case Vercel rewrites strip /api prefix)
   app.use('/api', apiRouter);
   app.use('/', apiRouter);

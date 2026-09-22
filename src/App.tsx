@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { PRODUCTS } from './data/products';
 import { SAMPLE_LOGOS } from './data/sampleLogos';
-import { ProductPreset, LogoTransform } from './types';
+import { ProductPreset, LogoTransform, GoogleAiTier, AuthMode } from './types';
 import { Header } from './components/Header';
 import { MockupCanvas } from './components/MockupCanvas';
 import { LogoUploader } from './components/LogoUploader';
@@ -14,17 +14,18 @@ import { ControlsPanel } from './components/ControlsPanel';
 import { CreateEditModal } from './components/ai/CreateEditModal';
 import { HighQualityModal } from './components/ai/HighQualityModal';
 import { VeoVideoModal } from './components/ai/VeoVideoModal';
+import { MusicModal } from './components/MusicModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
 import {
   Wand2,
   Sparkles,
   Film,
+  Music,
+  Crown,
   Layers,
   ArrowRight,
   CheckCircle2,
-  Sliders,
-  Maximize2,
   Key,
 } from 'lucide-react';
 
@@ -62,6 +63,23 @@ export default function App() {
   const [hasServerKey, setHasServerKey] = useState<boolean>(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
+  // Google AI Tier & Plan Mode persistence
+  const [googleAiTier, setGoogleAiTier] = useState<GoogleAiTier>(() => {
+    try {
+      return (localStorage.getItem('gemini_google_ai_tier') as GoogleAiTier) || 'none';
+    } catch {
+      return 'none';
+    }
+  });
+
+  const [authMode, setAuthMode] = useState<AuthMode>(() => {
+    try {
+      return (localStorage.getItem('gemini_auth_mode') as AuthMode) || 'api-key';
+    } catch {
+      return 'api-key';
+    }
+  });
+
   // Check server-side key status on load
   useEffect(() => {
     fetch('/api/health')
@@ -96,10 +114,34 @@ export default function App() {
     showToast('Saved API key removed.');
   };
 
+  const handleSaveGoogleAiTier = (tier: GoogleAiTier) => {
+    setGoogleAiTier(tier);
+    try {
+      localStorage.setItem('gemini_google_ai_tier', tier);
+    } catch (e) {
+      console.error('Failed to store Google AI tier:', e);
+    }
+    showToast(
+      tier !== 'none'
+        ? `Activated ${tier.replace('google-ai-', 'Google AI ')} Plan!`
+        : 'Google AI Plan reset.'
+    );
+  };
+
+  const handleSaveAuthMode = (mode: AuthMode) => {
+    setAuthMode(mode);
+    try {
+      localStorage.setItem('gemini_auth_mode', mode);
+    } catch (e) {
+      console.error('Failed to store auth mode:', e);
+    }
+  };
+
   // Modals state
   const [isCreateEditOpen, setIsCreateEditOpen] = useState(false);
   const [isHighQualityOpen, setIsHighQualityOpen] = useState(false);
   const [isVeoVideoOpen, setIsVeoVideoOpen] = useState(false);
+  const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
   const [veoInitialImage, setVeoInitialImage] = useState<string | null>(null);
   const [isVercelDeployOpen, setIsVercelDeployOpen] = useState(false);
 
@@ -139,40 +181,35 @@ export default function App() {
       ...prev,
       scale: prod.printArea.defaultScale,
       blendMode: prod.defaultBlendMode,
-      x: 0,
-      y: 0,
-      rotation: 0,
     }));
+    showToast(`Switched product to ${prod.name}`);
   };
 
-  const handleApplyLogoFromAI = (newLogoUrl: string) => {
-    setLogoUrl(newLogoUrl);
-    setTransform((prev) => ({
-      ...prev,
-      x: 0,
-      y: 0,
-      scale: currentProduct.printArea.defaultScale,
-      colorFilter: 'original',
-    }));
-    showToast('Generated image applied as active logo mockup!');
+  // AI Actions bridge
+  const handleApplyLogoFromAI = (imageUrl: string) => {
+    setLogoUrl(imageUrl);
+    showToast('AI-generated design applied directly to active mockup!');
   };
 
-  const handleSendToVeo = (imgUrl: string) => {
-    setVeoInitialImage(imgUrl);
+  const handleSendToVeo = (imageUrl: string) => {
+    setVeoInitialImage(imageUrl);
+    setIsCreateEditOpen(false);
+    setIsHighQualityOpen(false);
     setIsVeoVideoOpen(true);
+    showToast('Image loaded into Veo video animator.');
   };
 
   const handleSnapshotCaptured = (dataUrl: string) => {
     setMockupSnapshotUrl(dataUrl);
-    showToast('Mockup snapshot captured! Ready for Gemini edit or Veo animation.');
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
-      {/* Top Header */}
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-fuchsia-500/30 selection:text-fuchsia-200">
+      {/* Top Navigation Header */}
       <Header
         apiKey={apiKey}
         hasServerKey={hasServerKey}
+        googleAiTier={googleAiTier}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         onOpenCreateEdit={() => setIsCreateEditOpen(true)}
         onOpenHighQuality={() => setIsHighQualityOpen(true)}
@@ -180,35 +217,41 @@ export default function App() {
           setVeoInitialImage(null);
           setIsVeoVideoOpen(true);
         }}
+        onOpenMusicStudio={() => setIsMusicModalOpen(true)}
         onOpenVercelDeploy={() => setIsVercelDeployOpen(true)}
       />
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-        {/* Banner if no API key is configured */}
-        {!apiKey && !hasServerKey && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-indigo-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        {/* Banner if no API key or Google AI Tier is configured */}
+        {!apiKey && !hasServerKey && googleAiTier === 'none' && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-fuchsia-500/15 via-amber-500/10 to-indigo-500/15 border border-fuchsia-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
-                <Key className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-fuchsia-500/20 to-amber-500/20 border border-fuchsia-500/40 flex items-center justify-center text-fuchsia-300 shrink-0">
+                <Crown className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
-                  Gemini API Key Required to Unlock AI Studios
+                  Connect Gemini API Key or Google AI Plan to Unlock AI Studios
+                  <span className="text-[10px] bg-fuchsia-500/20 text-fuchsia-300 px-1.5 py-0.2 rounded font-mono">
+                    NEW Lyria 3 Music
+                  </span>
                 </p>
                 <p className="text-[11px] text-zinc-400">
-                  Provide your Gemini API key to enable AI image synthesis (Flash 3.1 & Pro 4K) and Veo 3 video rendering.
+                  Use your Gemini API key or choose a Google AI Tier (Pro, Plus, Ultra, Enterprise) to enable Lyria music, Veo video, and 4K images.
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsApiKeyModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs shrink-0 flex items-center justify-center gap-1.5 shadow transition-all active:scale-95"
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>Enter API Key</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsApiKeyModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-fuchsia-500 to-indigo-500 hover:opacity-90 text-white font-bold text-xs shrink-0 flex items-center justify-center gap-1.5 shadow transition-all active:scale-95"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Configure Key / Google AI</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -268,17 +311,43 @@ export default function App() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-400" />
-                Integrated Gemini AI & Veo Video Suite
+                <Sparkles className="w-4 h-4 text-fuchsia-400" />
+                Integrated Gemini AI, Veo Video & Lyria Music Suite
               </h2>
               <p className="text-xs text-zinc-400">
-                Create custom brand logos, render ultra high-def imagery, or generate animated product videos
+                Create custom brand logos, compose commercial music soundtracks, or animate apparel videos
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: Create & Edit Images */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Generate Music with Lyria 3 (NEW BIG UPDATE) */}
+            <div
+              id="feature-card-generate-music"
+              onClick={() => setIsMusicModalOpen(true)}
+              className="group p-4 rounded-2xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-fuchsia-500/50 cursor-pointer transition-all shadow-md hover:shadow-fuchsia-500/10 space-y-3 ring-1 ring-fuchsia-500/20"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center text-fuchsia-400 group-hover:scale-105 transition-transform">
+                  <Music className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 font-bold">
+                  lyria-3-clip & pro
+                </span>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-100 group-hover:text-fuchsia-300 transition-colors flex items-center gap-1.5">
+                  Generate Music
+                  <span className="text-[9px] bg-fuchsia-500/30 text-fuchsia-200 px-1 rounded font-normal">NEW</span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all ml-auto" />
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Compose bespoke commercial music soundtracks & clips with Google Lyria 3 for social reels and product launches.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Create & Edit Images */}
             <div
               id="feature-card-create-edit"
               onClick={() => setIsCreateEditOpen(true)}
@@ -289,13 +358,13 @@ export default function App() {
                   <Wand2 className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                  gemini-3.1-flash-image-preview
+                  gemini-3.1-flash
                 </span>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-zinc-100 group-hover:text-purple-300 transition-colors flex items-center gap-1.5">
                   Create & Edit Images
-                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all ml-auto" />
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
                   Use natural language text prompts to generate brand logos from scratch or edit existing graphics and mockups.
@@ -303,7 +372,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Card 2: Generate High-Quality Images (1K, 2K, 4K) */}
+            {/* Card 3: Generate High-Quality Images (1K, 2K, 4K) */}
             <div
               id="feature-card-high-quality"
               onClick={() => setIsHighQualityOpen(true)}
@@ -314,13 +383,13 @@ export default function App() {
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  gemini-3-pro-image-preview
+                  gemini-3-pro-image
                 </span>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-zinc-100 group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
-                  High-Quality Images (1K, 2K, 4K)
-                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  High-Quality (1K/2K/4K)
+                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all ml-auto" />
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
                   Generate hyper-detailed commercial product photoshoots with explicit affordances for 1K, 2K, and 4K output resolution.
@@ -328,7 +397,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Card 3: Veo 3 Video Generation */}
+            {/* Card 4: Veo 3 Video Generation */}
             <div
               id="feature-card-veo-video"
               onClick={() => {
@@ -342,13 +411,13 @@ export default function App() {
                   <Film className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
-                  veo-3.1-fast-generate-preview
+                  veo-3.1-fast
                 </span>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
-                  Veo 3 Video Generations
-                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  Veo 3 Video Studio
+                  <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all ml-auto" />
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
                   Animate your product mockup photo or generate commercial apparel videos in 16:9 (landscape) or 9:16 (portrait).
@@ -374,7 +443,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 mt-0.5">
-                Deploy to Vercel in 1 click with pre-configured <code className="text-zinc-300 font-mono">vercel.json</code>, Edge CDN frontend, and serverless Gemini API endpoints.
+                Deploy to Vercel in 1 click with pre-configured <code className="text-zinc-300 font-mono">vercel.json</code>, Edge CDN frontend, and serverless Gemini & Lyria API endpoints.
               </p>
             </div>
           </div>
@@ -428,14 +497,33 @@ export default function App() {
         onRequireApiKey={() => setIsApiKeyModalOpen(true)}
       />
 
-      {/* Gemini API Key Configuration Modal */}
+      {/* Lyria 3 AI Music Studio Modal */}
+      <MusicModal
+        isOpen={isMusicModalOpen}
+        onClose={() => setIsMusicModalOpen(false)}
+        apiKey={apiKey}
+        hasServerKey={hasServerKey}
+        googleAiTier={googleAiTier}
+        authMode={authMode}
+        onOpenApiKeyModal={() => {
+          setIsMusicModalOpen(false);
+          setIsApiKeyModalOpen(true);
+        }}
+        currentProductName={currentProduct.name}
+      />
+
+      {/* Gemini API Key & Google AI Plan Configuration Modal */}
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
         apiKey={apiKey}
         hasServerKey={hasServerKey}
+        googleAiTier={googleAiTier}
+        authMode={authMode}
         onSaveApiKey={handleSaveApiKey}
         onClearApiKey={handleClearApiKey}
+        onSaveGoogleAiTier={handleSaveGoogleAiTier}
+        onSaveAuthMode={handleSaveAuthMode}
       />
 
       {/* Vercel Deployment Modal */}

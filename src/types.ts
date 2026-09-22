@@ -72,3 +72,31 @@ export interface GenerationProgress {
   progressPercent?: number;
   errorMessage?: string;
 }
+
+// Authentication & Plan Modes
+export type GoogleAiTier =
+  | 'none'
+  | 'google-ai-pro'
+  | 'google-ai-plus'
+  | 'google-ai-ultra'
+  | 'google-ai-enterprise';
+
+export type AuthMode = 'api-key' | 'google-ai-tier';
+
+// Music Generation (Lyria)
+export type MusicModel = 'lyria-3-clip-preview' | 'lyria-3-pro-preview';
+
+export interface GeneratedTrack {
+  id: string;
+  title: string;
+  prompt: string;
+  model: MusicModel;
+  durationSeconds: number;
+  audioUrl: string; // data:audio/... or blob URL
+  genre?: string;
+  mood?: string;
+  tempo?: string;
+  isAiGenerated: boolean;
+  createdAt: string;
+}
+

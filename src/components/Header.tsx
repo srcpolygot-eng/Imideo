@@ -1,26 +1,32 @@
 import React from 'react';
-import { Sparkles, Film, Wand2, Key, CheckCircle, AlertCircle, Layers } from 'lucide-react';
+import { Sparkles, Film, Wand2, Key, Music, Layers, Crown } from 'lucide-react';
+import { GoogleAiTier } from '../types';
 
 interface HeaderProps {
   apiKey: string;
   hasServerKey: boolean;
+  googleAiTier?: GoogleAiTier;
   onOpenApiKeyModal: () => void;
   onOpenCreateEdit: () => void;
   onOpenHighQuality: () => void;
   onOpenVeoVideo: () => void;
+  onOpenMusicStudio: () => void;
   onOpenVercelDeploy: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   apiKey,
   hasServerKey,
+  googleAiTier = 'none',
   onOpenApiKeyModal,
   onOpenCreateEdit,
   onOpenHighQuality,
   onOpenVeoVideo,
+  onOpenMusicStudio,
   onOpenVercelDeploy,
 }) => {
   const hasKey = !!apiKey || hasServerKey;
+  const hasTier = googleAiTier !== 'none';
 
   return (
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-30">
@@ -38,35 +44,65 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </h1>
             <p className="text-xs text-zinc-400 hidden sm:block">
-              Mugs, T-Shirts & Apparel with Gemini AI Image & Veo Video Studio
+              Mockups with Gemini AI Image, Veo Video & Lyria Music Studio
             </p>
           </div>
         </div>
 
         {/* AI Studio Feature Quick Launch Bar */}
         <div className="flex items-center gap-2">
-          {/* Gemini API Key Button */}
+          {/* Gemini API Key & Google AI Tier Button */}
           <button
             id="nav-api-key-button"
             type="button"
             onClick={onOpenApiKeyModal}
             className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${
-              hasKey
+              hasTier
+                ? 'bg-fuchsia-950/30 hover:bg-fuchsia-900/40 border-fuchsia-500/40 text-fuchsia-300'
+                : hasKey
                 ? 'bg-zinc-900 hover:bg-zinc-850 border-emerald-500/40 text-emerald-300'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/50 text-amber-300 ring-1 ring-amber-500/30'
             }`}
-            title="Configure your Gemini API key"
+            title="Configure Gemini API Key or Google AI Plan (Pro, Plus, Ultra, Enterprise)"
           >
-            <Key className={`w-3.5 h-3.5 ${hasKey ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span className="hidden sm:inline">
-              {hasKey ? (apiKey ? 'API Key: Set' : 'API Key: Active') : 'Set Gemini API Key'}
-            </span>
-            <span className="sm:hidden">Key</span>
-            {hasKey ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            {hasTier ? (
+              <>
+                <Crown className="w-3.5 h-3.5 text-fuchsia-400" />
+                <span className="hidden sm:inline capitalize font-medium">
+                  {googleAiTier.replace('google-ai-', 'AI ')}
+                </span>
+                <span className="sm:hidden font-medium">AI</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
+              </>
             ) : (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              <>
+                <Key className={`w-3.5 h-3.5 ${hasKey ? 'text-emerald-400' : 'text-amber-400'}`} />
+                <span className="hidden sm:inline">
+                  {hasKey ? (apiKey ? 'API Key: Set' : 'API Key: Active') : 'Set Gemini Key'}
+                </span>
+                <span className="sm:hidden">Key</span>
+                {hasKey ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                )}
+              </>
             )}
+          </button>
+
+          {/* Feature: Lyria 3 AI Music Studio (NEW BIG UPDATE) */}
+          <button
+            id="nav-music-studio-button"
+            type="button"
+            onClick={onOpenMusicStudio}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-600 hover:from-fuchsia-500 hover:to-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-fuchsia-500/20 transition-all active:scale-95 ring-1 ring-fuchsia-400/40"
+            title="Generate commercial music with Google Lyria 3 (lyria-3-clip-preview & lyria-3-pro-preview)"
+          >
+            <Music className="w-3.5 h-3.5 text-fuchsia-100" />
+            <span>Generate Music</span>
+            <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-mono hidden md:inline">
+              NEW Lyria 3
+            </span>
           </button>
 
           {/* Feature: Create & Edit Images */}
@@ -104,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Generate or animate videos using veo-3.1-fast-generate-preview (16:9 or 9:16)"
           >
             <Film className="w-3.5 h-3.5 text-cyan-200" />
-            <span>Veo Video</span>
+            <span className="hidden sm:inline">Veo Video</span>
           </button>
 
           {/* Vercel Deployment Option */}
