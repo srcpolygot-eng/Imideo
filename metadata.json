@@ -1,0 +1,7 @@
+{
+  "name": "Product Mockup Studio",
+  "description": "Upload your logo to preview on realistic mugs, t-shirts, and apparel mockups with Gemini AI image creation, editing, and Veo video generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
