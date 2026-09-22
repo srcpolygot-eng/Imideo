@@ -8,6 +8,7 @@ interface HeaderProps {
   onOpenCreateEdit: () => void;
   onOpenHighQuality: () => void;
   onOpenVeoVideo: () => void;
+  onOpenVercelDeploy: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCreateEdit,
   onOpenHighQuality,
   onOpenVeoVideo,
+  onOpenVercelDeploy,
 }) => {
   const hasKey = !!apiKey || hasServerKey;
 
@@ -103,6 +105,23 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Film className="w-3.5 h-3.5 text-cyan-200" />
             <span>Veo Video</span>
+          </button>
+
+          {/* Vercel Deployment Option */}
+          <button
+            id="nav-vercel-deploy-button"
+            type="button"
+            onClick={onOpenVercelDeploy}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            title="Deploy this application to Vercel"
+          >
+            <svg viewBox="0 0 76 65" fill="currentColor" className="w-3 h-3 translate-y-[0.5px]">
+              <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+            </svg>
+            <span className="hidden sm:inline">Deploy</span>
+            <span className="text-[10px] bg-zinc-900 text-zinc-200 px-1.5 py-0.2 rounded font-mono hidden md:inline">
+              Vercel
+            </span>
           </button>
         </div>
       </div>

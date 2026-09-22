@@ -15,6 +15,7 @@ import { CreateEditModal } from './components/ai/CreateEditModal';
 import { HighQualityModal } from './components/ai/HighQualityModal';
 import { VeoVideoModal } from './components/ai/VeoVideoModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { VercelDeployModal } from './components/VercelDeployModal';
 import {
   Wand2,
   Sparkles,
@@ -100,6 +101,7 @@ export default function App() {
   const [isHighQualityOpen, setIsHighQualityOpen] = useState(false);
   const [isVeoVideoOpen, setIsVeoVideoOpen] = useState(false);
   const [veoInitialImage, setVeoInitialImage] = useState<string | null>(null);
+  const [isVercelDeployOpen, setIsVercelDeployOpen] = useState(false);
 
   // Notification toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -178,6 +180,7 @@ export default function App() {
           setVeoInitialImage(null);
           setIsVeoVideoOpen(true);
         }}
+        onOpenVercelDeploy={() => setIsVercelDeployOpen(true)}
       />
 
       {/* Main Workspace */}
@@ -354,6 +357,39 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        {/* Vercel Deployment Support Banner */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-900 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-white text-zinc-950 flex items-center justify-center shrink-0 shadow-md shadow-white/10">
+              <svg viewBox="0 0 76 65" fill="currentColor" className="w-4 h-4 translate-y-[0.5px]">
+                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Vercel Deployment Ready</h4>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Vite + Serverless API
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Deploy to Vercel in 1 click with pre-configured <code className="text-zinc-300 font-mono">vercel.json</code>, Edge CDN frontend, and serverless Gemini API endpoints.
+              </p>
+            </div>
+          </div>
+          <button
+            id="workspace-deploy-vercel-button"
+            type="button"
+            onClick={() => setIsVercelDeployOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 font-bold text-xs shrink-0 flex items-center justify-center gap-2 shadow-md shadow-white/10 transition-all active:scale-95"
+          >
+            <svg viewBox="0 0 76 65" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+            </svg>
+            <span>Deploy to Vercel</span>
+          </button>
+        </div>
       </main>
 
       {/* Modals */}
@@ -400,6 +436,18 @@ export default function App() {
         hasServerKey={hasServerKey}
         onSaveApiKey={handleSaveApiKey}
         onClearApiKey={handleClearApiKey}
+      />
+
+      {/* Vercel Deployment Modal */}
+      <VercelDeployModal
+        isOpen={isVercelDeployOpen}
+        onClose={() => setIsVercelDeployOpen(false)}
+        apiKey={apiKey}
+        hasServerKey={hasServerKey}
+        onOpenApiKeyModal={() => {
+          setIsVercelDeployOpen(false);
+          setIsApiKeyModalOpen(true);
+        }}
       />
     </div>
   );
