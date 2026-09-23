@@ -10,11 +10,17 @@ import {
   Download,
   RotateCw,
   Camera,
+  Image as ImageIcon,
+  Shirt,
 } from 'lucide-react';
+
+export type WorkspaceMode = 'products' | 'image-studio';
 
 interface HeaderProps {
   apiKey: string;
   hasServerKey: boolean;
+  workspaceMode?: WorkspaceMode;
+  onWorkspaceChange?: (mode: WorkspaceMode) => void;
   onOpenApiKeyModal: () => void;
   onOpenCreateEdit: () => void;
   onOpenHighQuality: () => void;
@@ -32,6 +38,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   apiKey,
   hasServerKey,
+  workspaceMode = 'products',
+  onWorkspaceChange,
   onOpenApiKeyModal,
   onOpenCreateEdit,
   onOpenHighQuality,
@@ -50,24 +58,50 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-        {/* App Title */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
             <Layers className="w-5 h-5" />
           </div>
           <div className="hidden sm:block">
             <h1 className="text-sm font-bold text-white leading-tight tracking-tight">
-              Product Mockup Studio
+              Creative Studio
             </h1>
             <p className="text-[10px] text-zinc-500 font-medium">
-              Gemini · Veo · Lyria AI
+              Products · Image Studio · AI
             </p>
           </div>
+
+          {onWorkspaceChange && (
+            <div className="hidden md:flex items-center p-0.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-semibold ml-2">
+              <button
+                type="button"
+                onClick={() => onWorkspaceChange('products')}
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                  workspaceMode === 'products'
+                    ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-zinc-700'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Shirt className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Products</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onWorkspaceChange('image-studio')}
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                  workspaceMode === 'image-studio'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Image Studio</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Nav Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
-          {/* Create / Edit with AI */}
           <button
             id="nav-create-edit-button"
             type="button"
@@ -79,7 +113,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Create</span>
           </button>
 
-          {/* High Quality 4K */}
           <button
             id="nav-high-quality-button"
             type="button"
@@ -91,7 +124,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">4K</span>
           </button>
 
-          {/* Export */}
           <button
             id="nav-export-button"
             type="button"
@@ -104,7 +136,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[10px] text-indigo-400 font-mono hidden lg:inline">300 DPI</span>
           </button>
 
-          {/* Gemini API Key Login Button */}
           <button
             id="nav-api-key-button"
             type="button"
@@ -132,7 +163,6 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* Lyria 3 AI Music Studio */}
           <button
             id="nav-music-studio-button"
             type="button"
@@ -145,7 +175,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-mono hidden md:inline">Lyria 3</span>
           </button>
 
-          {/* Veo Video */}
           <button
             id="nav-veo-video-button"
             type="button"
@@ -157,7 +186,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Video</span>
           </button>
 
-          {/* Vercel Deployment Option */}
           <button
             id="nav-vercel-deploy-button"
             type="button"
