@@ -1,5 +1,5 @@
 /**
- * Generation quota system
+ * Client-side generation usage tracking for free vs paid quota system
  * - Free (no API key): limited demo generations per day
  * - Paid (API key present): much higher daily quota
  */
@@ -49,42 +49,31 @@ function saveUsage(usage: DayUsage) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(usage));
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 
-export function getLimits(hasApiKey: boolean): Record<GenerationKind, number> {
-  return hasApiKey ? { ...PAID_DAILY_LIMITS } : { ...FREE_DAILY_LIMITS };
-}
-
-export function getUsed(kind: GenerationKind): number {
-  const usage = loadUsage();
-  return usage.counts[kind] ?? 0;
-}
-
-export function getRemaining(kind: GenerationKind, hasApiKey: boolean): number {
-  const limit = getLimits(hasApiKey)[kind];
-  return Math.max(0, limit - getUsed(kind));
-}
-
 export function canGenerate(kind: GenerationKind, hasApiKey: boolean): boolean {
-  return getRemaining(kind, hasApiKey) > 0;
-}
-
-export function consumeGeneration(kind: GenerationKind): number {
+  const limits = hasApiKey ? PAID_DAILY_LIMITS : FREE_DAILY_LIMITS;
   const usage = loadUsage();
-  usage.counts[kind] = (usage.counts[kind] ?? 0) + 1;
-  saveUsage(usage);
-  return usage.counts[kind]!;
+  const used = usage.counts[kind] || 0;
+  return used < limits[kind];
 }
 
-export function getUsageSummary(hasApiKey: boolean) {
-  const limits = getLimits(hasApiKey);
-  return {
-    tier: hasApiKey ? ('paid' as const) : ('free' as const),
-    veo: { used: getUsed('veo'), limit: limits.veo, remaining: getRemaining('veo', hasApiKey) },
-    image: { used: getUsed('image'), limit: limits.image, remaining: getRemaining('image', hasApiKey) },
-    music: { used: getUsed('music'), limit: limits.music, remaining: getRemaining('music', hasApiKey) },
-    omni: { used: getUsed('omni'), limit: limits.omni, remaining: getRemaining('omni', hasApiKey) },
-  };
+export function consumeGeneration(kind: GenerationKind, hasApiKey: boolean): boolean {
+  if (!canGenerate(kind, hasApiKey)) return false;
+  const usage = loadUsage();
+  usage.counts[kind] = (usage.counts[kind] || 0) + 1;
+  saveUsage(usage);
+  return true;
+}
+
+export function getUsageSummary(hasApiKey: boolean): Record<GenerationKind, { used: number; limit: number }> {
+  const limits = hasApiKey ? PAID_DAILY_LIMITS : FREE_DAILY_LIMITS;
+  const usage = loadUsage();
+  const result = {} as Record<GenerationKind, { used: number; limit: number }>;
+  (Object.keys(limits) as GenerationKind[]).forEach((k) => {
+    result[k] = { used: usage.counts[k] || 0, limit: limits[k] };
+  });
+  return result;
 }
