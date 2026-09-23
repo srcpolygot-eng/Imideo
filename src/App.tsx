@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { PRODUCTS } from './data/products';
 import { SAMPLE_LOGOS } from './data/sampleLogos';
 import { ProductPreset, LogoTransform } from './types';
-import { Header } from './components/Header';
+import { Header, WorkspaceMode } from './components/Header';
 import { MockupCanvas } from './components/MockupCanvas';
 import { LogoUploader } from './components/LogoUploader';
 import { ControlsPanel } from './components/ControlsPanel';
@@ -22,23 +22,16 @@ import { VideoAdSynthesizerModal } from './components/VideoAdSynthesizerModal';
 import { BatchBrandKitModal } from './components/BatchBrandKitModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
+import { ImageStudio } from './components/ImageStudio';
 import {
-  Wand2,
-  Sparkles,
-  Film,
-  Music,
-  Layers,
-  ArrowRight,
   CheckCircle2,
   Key,
-  Shuffle,
-  RotateCw,
-  Camera,
-  Download,
-  Palette,
+  Image as ImageIcon,
+  Shirt,
 } from 'lucide-react';
 
 export default function App() {
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('products');
   const [currentProduct, setCurrentProduct] = useState<ProductPreset>(PRODUCTS[0]);
   const [selectedColor, setSelectedColor] = useState<string>(PRODUCTS[0].defaultColor);
   const [logoUrl, setLogoUrl] = useState<string | null>(SAMPLE_LOGOS[0].dataUrl);
@@ -97,7 +90,7 @@ export default function App() {
     try {
       localStorage.setItem('gemini_custom_api_key', newKey);
     } catch (e) {
-      console.error('Failed to store API key in localStorage:', e);
+      console.error('Failed to store API key:', e);
     }
     showToast('Logged in successfully! AI features unlocked.');
   };
@@ -166,7 +159,7 @@ export default function App() {
 
   const handleApplyLogoFromAI = (imageUrl: string) => {
     setLogoUrl(imageUrl);
-    showToast('AI-generated design applied directly to active mockup!');
+    showToast('AI-generated design applied to mockup!');
   };
 
   const handleSendToVeo = (imageUrl: string) => {
@@ -186,6 +179,8 @@ export default function App() {
       <Header
         apiKey={apiKey}
         hasServerKey={hasServerKey}
+        workspaceMode={workspaceMode}
+        onWorkspaceChange={setWorkspaceMode}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         onOpenCreateEdit={() => setIsCreateEditOpen(true)}
         onOpenHighQuality={() => setIsHighQualityOpen(true)}
@@ -204,76 +199,106 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {!apiKey && !hasServerKey && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-fuchsia-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
-                <Key className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
-                  Login with Gemini API Key to Unlock AI Studios
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                    Lyria 3 · Veo · Try-On
-                  </span>
-                </p>
-                <p className="text-[11px] text-zinc-400">
-                  Enter your Gemini API key to enable Lyria music, Virtual Try-On, Veo video, and 4K images.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsApiKeyModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-500 to-fuchsia-500 hover:opacity-90 text-white font-bold text-xs shrink-0 flex items-center justify-center gap-1.5 shadow transition-all active:scale-95"
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Login with API Key</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-          <div className="lg:col-span-5 space-y-6">
-            <LogoUploader
-              currentLogoUrl={logoUrl}
-              onLogoSelected={(dataUrl, name) => {
-                setLogoUrl(dataUrl);
-                showToast(`Logo loaded: ${name || 'Custom logo'}`);
-              }}
-              onClearLogo={() => {
-                setLogoUrl(null);
-                showToast('Logo cleared.');
-              }}
-            />
-            <ControlsPanel
-              currentProduct={currentProduct}
-              selectedColor={selectedColor}
-              transform={transform}
-              onSelectProduct={handleSelectProduct}
-              onSelectColor={(hex) => setSelectedColor(hex)}
-              onUpdateTransform={handleUpdateTransform}
-              onResetTransform={handleResetTransform}
-            />
-          </div>
-          <div className="lg:col-span-7 flex flex-col items-center">
-            <MockupCanvas
-              product={currentProduct}
-              selectedColor={selectedColor}
-              logoUrl={logoUrl}
-              transform={transform}
-              onUpdateTransform={handleUpdateTransform}
-              onResetTransform={handleResetTransform}
-              onSnapshot={handleSnapshotCaptured}
-            />
-          </div>
+        {/* Mobile workspace switcher */}
+        <div className="md:hidden flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setWorkspaceMode('products')}
+            className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 ${
+              workspaceMode === 'products' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
+            }`}
+          >
+            <Shirt className="w-3.5 h-3.5" />
+            Products
+          </button>
+          <button
+            type="button"
+            onClick={() => setWorkspaceMode('image-studio')}
+            className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 ${
+              workspaceMode === 'image-studio' ? 'bg-indigo-600 text-white' : 'text-zinc-400'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Image Studio
+          </button>
         </div>
+
+        {workspaceMode === 'image-studio' ? (
+          <ImageStudio
+            onExportToMockup={(dataUrl) => {
+              setLogoUrl(dataUrl);
+              setWorkspaceMode('products');
+              showToast('Artwork applied to product mockup!');
+            }}
+            onToast={showToast}
+          />
+        ) : (
+          <>
+            {!apiKey && !hasServerKey && (
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-fuchsia-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-zinc-100">Login with Gemini API Key to Unlock AI Studios</p>
+                    <p className="text-[11px] text-zinc-400">
+                      Enable Lyria music, Virtual Try-On, Veo video, and 4K images.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsApiKeyModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-500 to-fuchsia-500 text-white font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  Login with API Key
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+              <div className="lg:col-span-5 space-y-6">
+                <LogoUploader
+                  currentLogoUrl={logoUrl}
+                  onLogoSelected={(dataUrl, name) => {
+                    setLogoUrl(dataUrl);
+                    showToast(`Logo loaded: ${name || 'Custom logo'}`);
+                  }}
+                  onClearLogo={() => {
+                    setLogoUrl(null);
+                    showToast('Logo cleared.');
+                  }}
+                />
+                <ControlsPanel
+                  currentProduct={currentProduct}
+                  selectedColor={selectedColor}
+                  transform={transform}
+                  onSelectProduct={handleSelectProduct}
+                  onSelectColor={(hex) => setSelectedColor(hex)}
+                  onUpdateTransform={handleUpdateTransform}
+                  onResetTransform={handleResetTransform}
+                />
+              </div>
+              <div className="lg:col-span-7 flex flex-col items-center">
+                <MockupCanvas
+                  product={currentProduct}
+                  selectedColor={selectedColor}
+                  logoUrl={logoUrl}
+                  transform={transform}
+                  onUpdateTransform={handleUpdateTransform}
+                  onResetTransform={handleResetTransform}
+                  onSnapshot={handleSnapshotCaptured}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-semibold text-zinc-100 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-semibold text-zinc-100 shadow-2xl">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
