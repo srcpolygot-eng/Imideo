@@ -12,9 +12,10 @@ import {
   Camera,
   Image as ImageIcon,
   Shirt,
+  Clapperboard,
 } from 'lucide-react';
 
-export type WorkspaceMode = 'products' | 'image-studio';
+export type WorkspaceMode = 'products' | 'image-studio' | 'video-studio';
 
 interface HeaderProps {
   apiKey: string;
@@ -67,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
               Creative Studio
             </h1>
             <p className="text-[10px] text-zinc-500 font-medium">
-              Products · Image Studio · AI
+              Products · Image · Video · AI
             </p>
           </div>
 
@@ -76,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => onWorkspaceChange('products')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
                   workspaceMode === 'products'
                     ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-zinc-700'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -88,14 +89,26 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => onWorkspaceChange('image-studio')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
                   workspaceMode === 'image-studio'
                     ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>Image Studio</span>
+                <span>Image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onWorkspaceChange('video-studio')}
+                className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                  workspaceMode === 'video-studio'
+                    ? 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Clapperboard className="w-3.5 h-3.5" />
+                <span>Video</span>
               </button>
             </div>
           )}
