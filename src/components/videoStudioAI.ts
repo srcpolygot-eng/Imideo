@@ -1,4 +1,4 @@
-/** CapCut Video Studio — Gemini / Veo AI helpers (fixed API paths) */
+/** CapCut Video Studio — Gemini / Veo AI helpers (current model IDs) */
 import {
   canGenerate,
   consumeGeneration,
@@ -9,12 +9,14 @@ import type { AIModel, AspectRatio } from './videoStudioTypes';
 export type AIStatus = 'idle' | 'generating' | 'polling' | 'done' | 'error';
 
 function kindForModel(m: AIModel): GenerationKind {
-  if (m === 'veo-3.1-fast' || m === 'veo-3.1') return 'veo';
+  if (m === 'veo-3.1-fast' || m === 'veo-3.1' || m === 'veo-3.1-lite') return 'veo';
   return 'omni';
 }
 
 function modelId(m: AIModel): string {
   if (m === 'veo-3.1') return 'veo-3.1-generate-preview';
+  if (m === 'veo-3.1-lite') return 'veo-3.1-lite-generate-preview';
+  if (m === 'omni-flash') return 'gemini-omni-1.1-flash';
   return 'veo-3.1-fast-generate-preview';
 }
 
@@ -35,23 +37,33 @@ export async function runVeoGeneration(opts: {
   onVideo: (videoUrl: string) => void;
   signal?: { cancelled: boolean };
 }): Promise<void> {
-  const { apiKey, hasKey, model, prompt, image, aspect, onStatus, onVideo, signal } = opts;
+  const {
+    apiKey, hasKey, model, prompt, image, aspect, onStatus, onVideo, signal,
+  } = opts;
+
   const kind = kindForModel(model);
   if (!canGenerate(kind, hasKey)) {
-    onStatus('error', undefined, hasKey ? `Daily ${kind.toUpperCase()} limit reached.` : 'Free limit reached. Login with a Gemini API key for higher quotas.');
+    onStatus(
+      'error',
+      undefined,
+      hasKey
+        ? `Daily ${kind.toUpperCase()} limit reached.`
+        : 'Free limit reached. Login with a Gemini API key for higher quotas.'
+    );
     return;
   }
   if (!prompt.trim() && !image) {
     onStatus('error', undefined, 'Enter a prompt or attach an image.');
     return;
   }
-  onStatus('generating', 'Submitting to Veo…');
+
+  onStatus('generating', 'Submitting to Veo\u2026');
   try {
     consumeGeneration(kind);
     const body: Record<string, unknown> = {
       prompt: prompt.trim() || 'Cinematic product showcase, smooth camera, studio lighting',
       model: modelId(model),
-      aspectRatio: aspect === '1:1' || aspect === '4:5' ? '9:16' : aspect,
+      aspectRatio: aspect === '1:1' || aspect === '4:5' ? '9:16' : aspect === '21:9' ? '16:9' : aspect,
       resolution: '720p',
     };
     if (apiKey) body.apiKey = apiKey;
@@ -60,46 +72,49 @@ export async function runVeoGeneration(opts: {
       body.image = image;
       body.mimeType = 'image/png';
     }
-    let res = await fetch('/api/veo/generate-video', { method: 'POST', headers: headers(apiKey), body: JSON.stringify(body) });
+
+    let res = await fetch('/api/veo/generate-video', {
+      method: 'POST',
+      headers: headers(apiKey),
+      body: JSON.stringify(body),
+    });
     if (res.status === 404) {
-      res = await fetch('/api/veo/generate', { method: 'POST', headers: headers(apiKey), body: JSON.stringify(body) });
+      res = await fetch('/api/veo/generate', {
+        method: 'POST',
+        headers: headers(apiKey),
+        body: JSON.stringify(body),
+      });
     }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start generation');
+
     const opName = data.operationName || data.name;
     if (!opName) throw new Error('No operation name returned');
-    onStatus('polling', 'Rendering video…');
+
+    onStatus('polling', 'Rendering video\u2026');
+
     const poll = async (): Promise<void> => {
-      if (signal?.cancelled) return;
-      const pollRes = await fetch('/api/veo/poll', {
-        method: 'POST',
-        headers: headers(apiKey),
-        body: JSON.stringify({ operationName: opName, apiKey: apiKey || undefined }),
-      });
-      if (pollRes.status === 404) {
-        const st = await fetch('/api/veo/video-status', {
-          method: 'POST',
-          headers: headers(apiKey),
-          body: JSON.stringify({ operationName: opName }),
-        });
-        const stData = await st.json();
-        if (stData.error) throw new Error(stData.error.message || stData.error);
-        if (!stData.done) { await new Promise((r) => setTimeout(r, 4000)); return poll(); }
-        const dl = await fetch('/api/veo/video-download', {
-          method: 'POST',
-          headers: headers(apiKey),
-          body: JSON.stringify({ operationName: opName }),
-        });
-        if (!dl.ok) throw new Error('Failed to download video');
-        const blob = await dl.blob();
-        onVideo(URL.createObjectURL(blob));
-        onStatus('done', 'Video ready');
+      if (signal?.cancelled) {
+        onStatus('idle');
         return;
       }
-      const pollData = await pollRes.json();
-      if (pollData.error && pollData.status === 'FAILED') {
-        throw new Error(typeof pollData.error === 'string' ? pollData.error : pollData.error.message || 'Generation failed');
+      let pollRes = await fetch('/api/veo/poll', {
+        method: 'POST',
+        headers: headers(apiKey),
+        body: JSON.stringify({ operationName: opName }),
+      });
+      if (pollRes.status === 404) {
+        pollRes = await fetch('/api/veo/video-status', {
+          method: 'POST',
+          headers: headers(apiKey),
+          body: JSON.stringify({ operationName: opName }),
+        });
       }
+      const pollData = await pollRes.json();
+      if (!pollRes.ok) throw new Error(pollData.error || 'Poll failed');
+
+      if (pollData.error) throw new Error(pollData.error);
+
       if (pollData.done && pollData.videoUrl) {
         onVideo(pollData.videoUrl);
         onStatus('done', 'Video ready');
@@ -122,6 +137,7 @@ export async function runVeoGeneration(opts: {
       await new Promise((r) => setTimeout(r, 4000));
       return poll();
     };
+
     await poll();
   } catch (err: any) {
     onStatus('error', undefined, err.message || 'Generation failed');
@@ -142,7 +158,7 @@ export async function runImageGeneration(opts: {
     body: JSON.stringify({
       prompt,
       aspectRatio,
-      model: model || 'gemini-3-pro-image-preview',
+      model: model || 'gemini-3-pro-image',
       imageSize,
       apiKey: apiKey || undefined,
     }),
@@ -162,7 +178,11 @@ export async function runImageEdit(opts: {
   const res = await fetch('/api/gemini/edit-image', {
     method: 'POST',
     headers: headers(apiKey),
-    body: JSON.stringify({ prompt, imageBase64, apiKey: apiKey || undefined }),
+    body: JSON.stringify({
+      prompt,
+      imageBase64,
+      apiKey: apiKey || undefined,
+    }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Image edit failed');
