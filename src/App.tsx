@@ -49,9 +49,15 @@ export default function App() {
     flipY: false,
   });
   const [mockupSnapshotUrl, setMockupSnapshotUrl] = useState<string | null>(null);
+  // Gemini API Key state & persistence — strip keys that fail basic format (e.g. leftover "h")
   const [apiKey, setApiKey] = useState<string>(() => {
     try {
-      return localStorage.getItem('gemini_custom_api_key') || '';
+      const stored = localStorage.getItem('gemini_custom_api_key') || '';
+      if (stored && !/^AIza[0-9A-Za-z_\-]{20,}$/.test(stored.trim())) {
+        localStorage.removeItem('gemini_custom_api_key');
+        return '';
+      }
+      return stored;
     } catch {
       return '';
     }
@@ -199,7 +205,6 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Mobile workspace switcher */}
         <div className="md:hidden flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-semibold">
           <button
             type="button"
