@@ -151,7 +151,7 @@ export const MusicModal: React.FC<MusicModalProps> = ({
             tempo,
           }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (res.ok && data.audioUrl) {
           const newTrack: GeneratedTrack = {
             id: `lyria-${Date.now()}`,
@@ -168,15 +168,23 @@ export const MusicModal: React.FC<MusicModalProps> = ({
           };
           setTracks((prev) => [newTrack, ...prev]);
           loadTrack(newTrack, true);
-          setIsGenerating(false);
           return;
         }
-        setGenerationStep('Generating high-fidelity audio preview with local synthesizer...');
+        // Real API failed — surface error. Do NOT pretend synth is Lyria.
+        const reason =
+          data.error ||
+          (res.status === 401 || res.status === 403
+            ? 'API key rejected by Google. Re-login with a valid Gemini key.'
+            : `Lyria generation failed (HTTP ${res.status}).`);
+        setErrorMessage(reason);
+        return;
       }
+      // Free / no-key path only: local Web Audio preview (clearly labeled non-AI)
+      setGenerationStep('Synthesizing local preview (login with Gemini key for real Lyria)...');
       const synthesizedUrl = await synthesizeMockupTrack({ genre, durationSeconds, tempo });
       const previewTrack: GeneratedTrack = {
         id: `synth-${Date.now()}`,
-        title: `${genre} (${mood})`,
+        title: `${genre} (${mood}) — local preview`,
         prompt: prompt.trim(),
         model,
         durationSeconds,
@@ -191,26 +199,7 @@ export const MusicModal: React.FC<MusicModalProps> = ({
       loadTrack(previewTrack, true);
     } catch (err: any) {
       console.error('Music generation failure:', err);
-      try {
-        const fallbackUrl = await synthesizeMockupTrack({ genre, durationSeconds });
-        const fallbackTrack: GeneratedTrack = {
-          id: `fallback-${Date.now()}`,
-          title: `${genre} Preview`,
-          prompt: prompt.trim(),
-          model,
-          durationSeconds,
-          audioUrl: fallbackUrl,
-          genre,
-          mood,
-          tempo,
-          isAiGenerated: false,
-          createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setTracks((prev) => [fallbackTrack, ...prev]);
-        loadTrack(fallbackTrack, true);
-      } catch {
-        setErrorMessage(err.message || 'Failed to generate audio track.');
-      }
+      setErrorMessage(err?.message || 'Failed to generate audio track.');
     } finally {
       setIsGenerating(false);
     }
