@@ -1,6 +1,7 @@
 /** CapCut Video Studio — MediaRecorder timeline export */
 import type { AspectRatio, TimelineClip } from './videoStudioTypes';
 import { filterCss } from './videoStudioLib';
+import { gradeToCss, isDefaultGrade } from '../features/videoPro';
 
 export async function exportTimelineToWebM(opts: {
   clips: TimelineClip[];
@@ -90,7 +91,7 @@ export async function exportTimelineToWebM(opts: {
       const localT = (t - c.start) * c.speed;
       ctx.save();
       ctx.globalAlpha = c.opacity / 100;
-      ctx.filter = filterCss(c.filter);
+      ctx.filter = [filterCss(c.filter), isDefaultGrade(c.color) ? '' : gradeToCss(c.color)].filter((x) => x && x !== 'none').join(' ') || 'none';
 
       if (c.transition !== 'none' && c.transitionDuration > 0) {
         const td = c.transitionDuration;

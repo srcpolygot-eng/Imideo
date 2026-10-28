@@ -18,6 +18,12 @@ import {
 } from './videoStudioLib';
 import { runVeoGeneration, type AIStatus } from './videoStudioAI';
 import { exportTimelineToWebM, downloadBlob } from './videoStudioExport';
+import type { Marker, ColorGrade } from './videoStudioTypes';
+import { ProEditPanel } from './extras/ProEditPanel';
+import {
+  splitAllAt, removeRange, closeGaps, speedRamp, pasteAttributes, nextMarker, exportEDL, exportSRT,
+  gradeToCss, isDefaultGrade, emptyHistory, pushHistory, undo as undoH, redo as redoH, type History,
+} from '../features/videoPro';
 
 export type { VideoStudioProps } from './videoStudioTypes';
 
@@ -76,6 +82,66 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     playTimer.current = requestAnimationFrame(tick);
     return () => { if (playTimer.current) cancelAnimationFrame(playTimer.current); };
   }, [isPlaying, projectDuration]);
+
+  const [history, setHistory] = useState<History<TimelineClip[]>>(emptyHistory());
+  const committed = useRef<TimelineClip[]>([]);
+  const [markIn, setMarkIn] = useState<number | null>(null);
+  const [markOut, setMarkOut] = useState<number | null>(null);
+  const [markers, setMarkers] = useState<Marker[]>([]);
+  const [copied, setCopied] = useState<TimelineClip | null>(null);
+
+  useEffect(() => {
+    if (clips === committed.current) return;
+    const t = window.setTimeout(() => {
+      const prev = committed.current;
+      committed.current = clips;
+      setHistory((h) => pushHistory(h, prev));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [clips]);
+
+  const doUndo = () => {
+    // flush any pending change so it can be undone
+    const base = committed.current === clips ? history : pushHistory(history, committed.current);
+    const r = undoH(base, clips);
+    if (!r) return;
+    committed.current = r.state;
+    setHistory(r.h);
+    setClips(r.state);
+  };
+  const doRedo = () => {
+    const r = redoH(history, clips);
+    if (!r) return;
+    committed.current = r.state;
+    setHistory(r.h);
+    setClips(r.state);
+  };
+
+  const gradeStyle = (c: TimelineClip) => [filterCss(c.filter), isDefaultGrade(c.color) ? '' : gradeToCss(c.color)].filter((x) => x && x !== 'none').join(' ') || 'none';
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
+      else if (!mod && e.key.toLowerCase() === 'i') setMarkIn(playhead);
+      else if (!mod && e.key.toLowerCase() === 'o') setMarkOut(playhead);
+      else if (!mod && e.key.toLowerCase() === 'm') addMarker();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const addMarker = () => setMarkers((m) => [...m, { id: uid(), time: playhead, label: `M${m.length + 1}`, color: '#f43f5e' }]);
+  const rangeOp = (ripple: boolean) => {
+    if (markIn === null || markOut === null) return;
+    const a = Math.min(markIn, markOut), b = Math.max(markIn, markOut);
+    setClips((prev) => removeRange(prev, a, b, ripple));
+    setMarkIn(null); setMarkOut(null);
+    toast(ripple ? 'Extracted range' : 'Lifted range');
+  };
+  const download = (text: string, name: string, type: string) => downloadBlob(new Blob([text], { type }), name);
 
   const updateClip = (id: string, partial: Partial<TimelineClip>) => {
     setClips((prev) => prev.map((c) => (c.id === id ? { ...c, ...partial } : c)));
@@ -270,7 +336,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               {mainVisual?.src && (mainVisual.kind === 'image' || mainVisual.kind === 'video') ? (
                 mainVisual.kind === 'video' ? (
                   <video key={mainVisual.id} src={mainVisual.src} className="absolute inset-0 w-full h-full object-cover"
-                    style={{ filter: filterCss(mainVisual.filter), opacity: mainVisual.opacity / 100, transform: `translate(${mainVisual.posX}%, ${mainVisual.posY}%) scale(${mainVisual.scale / 100}) rotate(${mainVisual.rotation || 0}deg)` }}
+                    style={{ filter: gradeStyle(mainVisual), opacity: mainVisual.opacity / 100, transform: `translate(${mainVisual.posX}%, ${mainVisual.posY}%) scale(${mainVisual.scale / 100}) rotate(${mainVisual.rotation || 0}deg)` }}
                     muted={muted} playsInline
                     ref={(el) => {
                       if (!el) return;
@@ -282,7 +348,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   />
                 ) : (
                   <img src={mainVisual.src} alt="" className="absolute inset-0 w-full h-full object-cover"
-                    style={{ filter: filterCss(mainVisual.filter), opacity: mainVisual.opacity / 100, transform: `translate(${mainVisual.posX}%, ${mainVisual.posY}%) scale(${mainVisual.scale / 100}) rotate(${mainVisual.rotation || 0}deg)` }} />
+                    style={{ filter: gradeStyle(mainVisual), opacity: mainVisual.opacity / 100, transform: `translate(${mainVisual.posX}%, ${mainVisual.posY}%) scale(${mainVisual.scale / 100}) rotate(${mainVisual.rotation || 0}deg)` }} />
                 )
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-600 gap-2">
@@ -369,6 +435,27 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 </div>
               </>
             )}
+            <div className="border-t border-zinc-800 pt-2">
+              <ProEditPanel
+                selected={selected} canUndo={history.past.length > 0 || committed.current !== clips} canRedo={history.future.length > 0}
+                markIn={markIn} markOut={markOut} markers={markers} hasCopied={!!copied}
+                onUndo={doUndo} onRedo={doRedo}
+                onSplitAll={() => setClips((prev) => splitAllAt(prev, playhead))}
+                onSetIn={() => setMarkIn(playhead)} onSetOut={() => setMarkOut(playhead)}
+                onLift={() => rangeOp(false)} onExtract={() => rangeOp(true)}
+                onCloseGaps={() => setClips((prev) => closeGaps(prev))}
+                onAddMarker={addMarker}
+                onJumpMarker={(d) => { const m = nextMarker(markers, playhead, d); if (m) setPlayhead(m.time); }}
+                onRemoveMarker={(id) => setMarkers((m) => m.filter((x) => x.id !== id))}
+                onSeek={setPlayhead}
+                onCopyAttrs={() => { if (selected) { setCopied(selected); toast('Attributes copied'); } }}
+                onPasteAttrs={() => { if (selected && copied) updateClip(selected.id, pasteAttributes(copied, selected)); }}
+                onRamp={(f, t) => { if (selected) { setClips((prev) => [...prev.filter((c) => c.id !== selected.id), ...speedRamp(selected, f, t)]); setSelectedId(null); } }}
+                onGrade={(g: Partial<ColorGrade>) => { if (selected) updateClip(selected.id, { color: g as ColorGrade }); }}
+                onExportEDL={() => download(exportEDL(clips, 'Imideo Timeline'), 'timeline.edl', 'text/plain')}
+                onExportSRT={() => download(exportSRT(clips), 'subtitles.srt', 'text/plain')}
+              />
+            </div>
           </div>
         </div>
       </div>

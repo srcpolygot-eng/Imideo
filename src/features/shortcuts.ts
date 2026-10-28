@@ -19,6 +19,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { keys: 'C', action: 'Color palette from logo', scope: 'products' },
   { keys: 'Space', action: 'Play / pause timeline', scope: 'video' },
   { keys: 'S', action: 'Split clip at playhead', scope: 'video' },
+  { keys: 'I / O', action: 'Set mark in / out (Lift & Extract)', scope: 'video' },
+  { keys: 'M', action: 'Add marker at playhead', scope: 'video' },
   { keys: '[ / ]', action: 'Nudge playhead', scope: 'video' },
   { keys: 'B', action: 'Brush tool', scope: 'image' },
   { keys: 'V', action: 'Move / select tool', scope: 'image' },
